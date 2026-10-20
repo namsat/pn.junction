@@ -1,0 +1,65 @@
+site_name: pn.junction
+site_description: building a pn diode in COMSOL from scratch, with hand-written drift-diffusion PDEs
+site_url: https://namsat.github.io/pn.junction/
+repo_url: https://github.com/namsat/pn.junction
+repo_name: namsat/pn.junction
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  font: false
+  palette:
+    - scheme: slate
+      primary: black
+      accent: green
+      toggle:
+        icon: material/brightness-4
+        name: light mode
+    - scheme: default
+      primary: white
+      accent: green
+      toggle:
+        icon: material/brightness-7
+        name: dark mode
+  features:
+    - navigation.sections
+    - navigation.footer
+    - content.code.copy
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - css/term.css
+
+extra_javascript:
+  - js/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - footnotes
+  - toc:
+      permalink: "#"
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: false
+
+nav:
+  - README: index.md
+  - roadmap: roadmap.md
+  - "pn / 1D":
+      - 01 setup + parameters: pn-1d/01-setup.md
+      - 02 equations: pn-1d/02-equations.md
+      - 03 boundary conditions: pn-1d/03-boundary-conditions.md
+      - 04 mesh + solver: pn-1d/04-mesh-solver.md
+      - 05 equilibrium results: pn-1d/05-equilibrium.md
+  - assumptions: assumptions.md
+  - devlog: devlog.md
+  - refs: refs.md

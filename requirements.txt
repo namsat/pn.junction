@@ -1,0 +1,4 @@
+numpy
+matplotlib
+mkdocs-material>=9.5,<10
+mkdocs<2
