@@ -16,7 +16,7 @@
   <a href="#vars">undefined variables</a>
   <a href="#mesh">mesh</a>
   <a href="#bc">boundary conditions</a>
-  <a href="#c3">c3 selection?</a>
+  <a href="#c3">c3 selection (ok)</a>
 </nav>
 
 <main>
@@ -74,10 +74,10 @@ Failed to evaluate variable.
 <b>fix:</b> point 3 → <code>Vt*asinh(ND/(2*ni))</code>. Checked phin/phip too.</p>
 <figure><img src="img/psi_ok.jpg" alt="psi fixed" loading="lazy" style="max-width:560px"><figcaption>after the fix</figcaption></figure>
 
-<h2 id="c3"><span class="n">#5</span>c3 only on domain 2? (to check)</h2>
+<h2 id="c3"><span class="n">#5</span><s>c3 only on domain 2?</s> false alarm</h2>
 <figure><img src="img/sel_c3.jpg" alt="Coefficient Form PDE 3 selection" loading="lazy"></figure>
 <p>Clicking on Coefficient Form PDE 3 highlights only domain 2 (green). If the hole continuity equation isn't active on domain 1, step 1 doesn't care (only psi is solved), but step 2 would be wrong on the p+ side.</p>
-<p class="todo">TODO: check Domain Selection of c, c2, c3 → should be all domains (1, 2)</p>
+<p><b>checked:</b> Domain Selection of c, c2, c3 = domains 1 and 2. All fine, the green highlight was misleading. Leaving it here anyway: worth checking every time.</p>
 
 <h2><span class="n">#6</span>?</h2>
 <p class="todo">next one goes here</p>
