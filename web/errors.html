@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pn.junction / errors</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <a href="index.html">← pn.junction</a>
+  <div class="sep"></div>
+  <a href="#setup">setup</a>
+  <a href="#vars">undefined variables</a>
+  <a href="#mesh">mesh</a>
+  <a href="#bc">boundary conditions</a>
+</nav>
+
+<main>
+<header>
+  <h1>errors log</h1>
+  <div class="meta">things that went wrong, in the order they happened. kept so I don't do them twice.</div>
+</header>
+
+<h2 id="setup"><span class="n">#1</span>model wizard</h2>
+<p>Dependent variable came out as <code>psi3</code>, units <i>Dimensionless</i> and source <i>m^-2</i>. Not an error COMSOL complains about, but with wrong units you lose the unit check on every expression.</p>
+<figure><img src="img/model_wizard.jpg" alt="model wizard" loading="lazy"></figure>
+<p><b>fix:</b> rename the variable, set units with the pencil icon: V for all three, source C/m^3 (psi) and 1/s (phin, phip).</p>
+<p class="note">Also had a Component 2 with its own geometry and mesh, added by accident. Deleted.</p>
+
+<h2 id="vars"><span class="n">#2</span>undefined variables</h2>
+<pre>
+Undefined variable.
+ - Variable: comp1.Vt
+ - Geometry: geom1
+ - Domain: 2
+Failed to evaluate expression.
+ - Expression: comp1.Vt*asinh(0.5*comp1.Ndop/ni)
+</pre>
+<p><b>cause:</b> Variables 3 had its selection on <i>point 2</i> (the junction). A variable selected on a point only exists on that point.<br>
+<b>fix:</b> Variables 3 → Entire model. Also moved <code>Vt</code> to Parameters.</p>
+
+<pre>
+Undefined variable.
+ - Variable: ni
+ - Domain: 1
+</pre>
+<pre>
+Undefined variable.
+ - Variable: eps_s
+Failed to evaluate variable.
+ - Variable: comp1.c.c
+ - Defined as: eps_s
+Failed to evaluate variable.
+ - Variable: comp1.c.Ga
+...
+</pre>
+<p><b>cause:</b> parameters just not there.<br>
+<b>fix:</b> add them. Should have checked the whole list once instead of fixing them one per run.</p>
+<p class="note">rule: only read the first line. the rest is the chain of where it's used (here: c of the Poisson interface → flux → Jacobian). it's either not defined, or defined in a node with the wrong selection.</p>
+
+<h2 id="mesh"><span class="n">#3</span>mesh</h2>
+<p>Two Edge nodes, no idea how to make them fine at the junction. Edge 2 red because it had no selection.</p>
+<figure><img src="img/model_tree_mesh.jpg" alt="model tree, mesh" loading="lazy" style="max-width:420px"></figure>
+<p><b>fix:</b> Edge only says <i>where</i>. Need a Distribution child under each Edge to say <i>how</i> (geometric sequence, reverse on domain 1).</p>
+
+<h2 id="bc"><span class="n">#4</span>potential drops back at the cathode</h2>
+<figure><img src="img/psi_wrong_bc.jpg" alt="wrong psi at cathode" loading="lazy" style="max-width:220px"></figure>
+<p>ψ correct in the middle (−0.54 → +0.36 V, so Vbi was right), but falls back to −0.54 V at x = 12 µm. Looks like a second junction.</p>
+<p><b>cause:</b> cathode Dirichlet had the anode expression. (If two Dirichlet nodes select the same point, the lower one in the tree wins, so it can also be a selection problem.)<br>
+<b>fix:</b> point 3 → <code>Vt*asinh(ND/(2*ni))</code>. Checked phin/phip too.</p>
+<figure><img src="img/psi_ok.jpg" alt="psi fixed" loading="lazy" style="max-width:560px"><figcaption>after the fix</figcaption></figure>
+
+<h2><span class="n">#5</span>?</h2>
+<p class="todo">next one goes here</p>
+
+<footer><a href="index.html">← back</a></footer>
+</main>
+</div>
+</body>
+</html>

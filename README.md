@@ -1,20 +1,14 @@
 # pn.junction
 
-pn diode (and later BJT / MOSFET) in COMSOL **without the Semiconductor Module**: drift-diffusion written by hand as three Coefficient Form PDEs, checked against textbook formulas and a small independent Python solver.
+pn diode (later BJT / MOS) in COMSOL without the Semiconductor Module. Drift-diffusion typed in by hand as 3 Coefficient Form PDEs.
 
-Site / tutorial: https://namsat.github.io/pn.junction/
+Notes: https://namsat.github.io/pn.junction/
 
-**Status:** WIP. 1D equilibrium done, I-V next.
+status: 1D equilibrium ok, I-V next.
 
 ```
-analytics/   reference numbers + independent Poisson solver (python)
-comsol/      .mph models
-data/        expected values, python solution, COMSOL exports
-docs/        the site (mkdocs-material)
-```
-
-```bash
-pip install -r requirements.txt
-python analytics/pn1d_reference.py   # regenerates plots + data/reference/
-mkdocs serve                         # site on localhost:8000
+web/         the notes page (plain html, published to gh-pages on push)
+comsol/      .mph files
+analytics/   numbers by hand (python), no plots
+data/        expected values, comsol exports
 ```
