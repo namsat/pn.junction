@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pn.junction</title>
+<meta name="description" content="pn diode in COMSOL without the Semiconductor Module. Working notes.">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}]})"></script>
+</head>
+<body>
+<div class="wrap">
+
+<nav id="toc">
+  <a href="#top">pn.junction</a>
+  <div class="sep"></div>
+  <a href="#device">01 device</a>
+  <a href="#params">02 parameters</a>
+  <a href="#vars">03 variables</a>
+  <a href="#eqs">04 equations</a>
+  <a href="#bc">05 boundary conditions</a>
+  <a href="#mesh">06 mesh</a>
+  <a href="#study">07 study</a>
+  <a href="#a1">08 results, equilibrium</a>
+  <a href="#assume">09 what I'm ignoring</a>
+  <a href="#next">10 next</a>
+  <div class="sep"></div>
+  <a href="errors.html">errors log →</a>
+  <a href="https://github.com/namsat/pn.junction">github →</a>
+  <a href="https://namsat.github.io/">← namsat.github.io</a>
+</nav>
+
+<main>
+<header id="top">
+  <h1>pn.junction</h1>
+  <div class="meta">pn diode in COMSOL, no Semiconductor Module. drift-diffusion written by hand as 3 Coefficient Form PDEs.<br>
+  working notes, not a tutorial. last update: 21 oct 2026, 00:20. status: 1D equilibrium ok, I-V next.</div>
+</header>
+
+<p>I don't have the Semiconductor Module, so the equations go in by hand. Upside: every assumption is something I typed, so I can also take it out later. Plan is 1D → 2D → 3D for the pn junction, then BJT and MOS. Full roadmap at the <a href="#next">bottom</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="device"><span class="n">01</span>device</h2>
+
+<p>Abrupt p+/n junction, 1D. Two regions, uniform doping each. No epi, no n+ substrate (later, maybe).</p>
+
+<pre>
+ anode                     cathode
+   |  p+  1e19  |      n  1e16          |
+   x=0         2um                    12um
+</pre>
+
+<p>Why asymmetric: depletion region sits almost all on the n side, so the one-sided formulas apply. And 1e19 on the p+ side makes Auger / bandgap narrowing visible later.</p>
+<p>Why 10&nbsp;µm of n: at breakdown (~50-60&nbsp;V) depletion reaches ~2.7&nbsp;µm. Has to fit.</p>
+<p>1D = very wide diode, nothing changes along y, z. Quantities stay per volume, currents come out in A/m², multiply by area for amps.</p>
+
+<figure>
+  <img src="img/geometry.jpg" alt="COMSOL geometry: two intervals" loading="lazy" style="max-width:560px">
+  <figcaption>geometry: two Interval nodes (0 → Lp_reg, Lp_reg → L_tot). Component 2 in the tree was a mistake, deleted later.</figcaption>
+</figure>
+
+<p>After Form Union, points are numbered by x, not by creation order:</p>
+<table>
+<tr><th>entity</th><th>x</th><th>what</th></tr>
+<tr><td>domain 1</td><td>0 - 2 µm</td><td>p+</td></tr>
+<tr><td>domain 2</td><td>2 - 12 µm</td><td>n</td></tr>
+<tr><td>point 1</td><td>0</td><td>anode</td></tr>
+<tr><td>point 2</td><td>2 µm</td><td>junction (interior)</td></tr>
+<tr><td>point 3</td><td>12 µm</td><td>cathode</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="params"><span class="n">02</span>parameters</h2>
+
+<p>Global Definitions → Parameters. Copy-paste ready:</p>
+<pre>
+T0       300[K]
+Vt       k_B_const*T0/e_const     // ~25.85 mV
+NA       1e19[1/cm^3]
+ND       1e16[1/cm^3]
+ni       9.65e9[1/cm^3]           // not 1.5e10. J0 ~ ni^2, matters
+Lp_reg   2[um]
+Ln_reg   10[um]
+L_tot    Lp_reg+Ln_reg
+A_d      1e-4[cm^2]               // 100 x 100 um
+eps_s    11.7*epsilon0_const
+mun      1400[cm^2/(V*s)]         // constant for now
+mup      470[cm^2/(V*s)]          // constant for now
+tau_n    1[us]
+tau_p    1[us]
+V0       0[V]                     // anode, swept later
+</pre>
+<p class="note">no Materials node. everything is a parameter.</p>
+
+<!-- ============================================================ -->
+<h2 id="vars"><span class="n">03</span>variables</h2>
+
+<p>Component 1 → Definitions → Variables. The selection decides <em>where the variable exists</em>.</p>
+<pre>
+Variables 1/2   one per domain
+  [domain 1, p+]   Ndop = -NA
+  [domain 2, n]    Ndop =  ND
+
+Variables 3   [entire model]
+  n      ni*exp((psi-phin)/Vt)
+  p      ni*exp((phip-psi)/Vt)
+  R      (n*p-ni^2)/(tau_p*(n+ni)+tau_n*(p+ni))
+  Jn     -e_const*mun*n*phinx
+  Jp     -e_const*mup*p*phipx
+  J      Jn+Jp
+  I_tot  J*A_d
+</pre>
+<p>Doping per domain → the step lands exactly on point 2. No <code>if()</code>.</p>
+
+<figure>
+  <img src="img/sel_variables2.jpg" alt="Variables 2 selection highlights domain 1" loading="lazy">
+  <figcaption>in my file Variables 2 is the one on domain 1 (red = selected). order doesn't matter, the domain does.</figcaption>
+</figure>
+
+<!-- ============================================================ -->
+<h2 id="eqs"><span class="n">04</span>equations</h2>
+
+<p>Unknowns are three potentials (V), not n and p. n, p span 30 orders of magnitude and Newton hates that.</p>
+<table>
+<tr><th>unknown</th><th></th></tr>
+<tr><td><code>psi</code></td><td>electrostatic potential ψ</td></tr>
+<tr><td><code>phin</code></td><td>electron quasi-Fermi potential, E<sub>Fn</sub> = −qφ<sub>n</sub></td></tr>
+<tr><td><code>phip</code></td><td>hole quasi-Fermi potential, E<sub>Fp</sub> = −qφ<sub>p</sub></td></tr>
+</table>
+
+<p>Statistics (Boltzmann):</p>
+<div class="eq">$$n = n_i\, e^{(\psi-\phi_n)/V_T}\qquad p = n_i\, e^{(\phi_p-\psi)/V_T}$$</div>
+
+<p>Poisson:</p>
+<div class="eq">$$-\frac{d}{dx}\!\left(\varepsilon_s\frac{d\psi}{dx}\right) = q\,(p-n+N_{dop})$$</div>
+
+<p>Continuity, steady state:</p>
+<div class="eq">$$-\frac{d}{dx}\!\left(\mu_n\, n\,\frac{d\phi_n}{dx}\right) = R\qquad -\frac{d}{dx}\!\left(\mu_p\, p\,\frac{d\phi_p}{dx}\right) = -R$$</div>
+
+<p>SRH, midgap trap:</p>
+<div class="eq">$$R = \frac{np-n_i^2}{\tau_p(n+n_i)+\tau_n(p+n_i)}$$</div>
+
+<details><summary>where the continuity form comes from</summary><div>
+<p>J<sub>n</sub> = qμ<sub>n</sub>nE + qD<sub>n</sub> dn/dx. Differentiate n = n<sub>i</sub>exp((ψ−φ<sub>n</sub>)/V<sub>T</sub>), plug in with E = −dψ/dx and D = μV<sub>T</sub>: the ψ terms cancel and</p>
+<div class="eq">$$J_n = -q\,\mu_n\, n\,\frac{d\phi_n}{dx}$$</div>
+<p>then (1/q) dJ<sub>n</sub>/dx = R. Same for holes with the sign flipped.</p>
+</div></details>
+
+<h3>into COMSOL</h3>
+<p>Coefficient form: \(\nabla\cdot(-c\nabla u - \alpha u+\gamma)+\beta\cdot\nabla u + a u = f\). All three are just \(-\nabla\cdot(c\nabla u)=f\): conservation law, flux down the gradient. Only <b>c</b> and <b>f</b> nonzero.</p>
+<table>
+<tr><th>interface</th><th>u</th><th>u unit</th><th>f unit</th><th>c</th><th>f</th></tr>
+<tr><td>c</td><td>psi</td><td>V</td><td>C/m^3</td><td><code>eps_s</code></td><td><code>e_const*(p-n+Ndop)</code></td></tr>
+<tr><td>c2</td><td>phin</td><td>V</td><td>1/s</td><td><code>mun*n/ni</code></td><td><code>R/ni</code></td></tr>
+<tr><td>c3</td><td>phip</td><td>V</td><td>1/s</td><td><code>mup*p/ni</code></td><td><code>-R/ni</code></td></tr>
+</table>
+<p class="note">continuity divided by ni → numbers ~1 instead of ~1e25. Same solution. Default f is 1, change it. a, ea, da, α, β, γ → 0.</p>
+
+<figure>
+  <img src="img/model_wizard.jpg" alt="COMSOL model wizard with three Coefficient Form PDEs" loading="lazy">
+  <figcaption>model wizard. defaults are Dimensionless / m^-2, change both with the pencil icon.</figcaption>
+</figure>
+
+<p class="note">Not in the model on purpose: Shockley, Vbi, W. Those are what the model should give back, so they're for checking, not input.</p>
+
+<!-- ============================================================ -->
+<h2 id="bc"><span class="n">05</span>boundary conditions</h2>
+
+<p>Ohmic contact = neutral + in equilibrium + quasi-Fermi levels pinned to the metal (φ<sub>n</sub> = φ<sub>p</sub> = V). From neutrality with Boltzmann:</p>
+<div class="eq">$$\psi = V + V_T\,\mathrm{asinh}\!\left(\frac{N_{dop}}{2n_i}\right)$$</div>
+
+<details><summary>derivation</summary><div>
+<p>With φ<sub>n</sub> = φ<sub>p</sub> = V: n − p = 2n<sub>i</sub> sinh((ψ−V)/V<sub>T</sub>). Neutrality says n − p = N<sub>dop</sub>. Solve for ψ. For |N<sub>dop</sub>| ≫ n<sub>i</sub> it's just V ± V<sub>T</sub> ln(|N<sub>dop</sub>|/n<sub>i</sub>).</p>
+</div></details>
+
+<p>Dirichlet nodes (right click each interface, twice):</p>
+<table>
+<tr><th></th><th>point 1, anode</th><th>point 3, cathode</th></tr>
+<tr><td>psi</td><td><code>V0+Vt*asinh(-NA/(2*ni))</code></td><td><code>Vt*asinh(ND/(2*ni))</code></td></tr>
+<tr><td>phin</td><td><code>V0</code></td><td><code>0</code></td></tr>
+<tr><td>phip</td><td><code>V0</code></td><td><code>0</code></td></tr>
+</table>
+<p>At V0 = 0: ψ<sub>anode</sub> = −0.537 V, ψ<sub>cathode</sub> = +0.358 V. Difference = V<sub>T</sub> ln(N<sub>A</sub>N<sub>D</sub>/n<sub>i</sub>²) = V<sub>bi</sub>. So Vbi is already in the BCs, the solver only finds the shape in between.</p>
+<p>Junction (point 2): nothing. Same equations on both sides → COMSOL keeps ψ, E, φ, J continuous by itself.</p>
+<p>Zero Flux node stays in the tree, overridden at the contacts.</p>
+
+<h3>initial values</h3>
+<pre>
+psi    Vt*asinh(Ndop/(2*ni))     // local neutrality
+phin   0
+phip   0
+</pre>
+
+<!-- ============================================================ -->
+<h2 id="mesh"><span class="n">06</span>mesh</h2>
+
+<p>Debye length ~1.3 nm on p+, ~41 nm on n → sub-nm at the junction. 1D is cheap.</p>
+<pre>
+Edge 1 [domain 1] → Distribution: exponential, fine end at x = 2 um (reversed)
+Edge 2 [domain 2] → Distribution: exponential, fine end at x = 2 um
+  elements / element ratio:  ? / ?     &lt;- fill in
+</pre>
+<p>Planned a geometric sequence (400 el ratio 200 on p+, 600 el ratio 1000 on n, ~0.1 nm at the junction), but my Distribution node has no "geometric" option, so I went with <b>exponential</b>. Same idea: small elements at the junction, growing towards the contacts. Domain 1 runs 0 → 2 µm, so the fine end has to be flipped.</p>
+
+<figure>
+  <img src="img/tree_mesh_psi.jpg" alt="model tree with Edge + Distribution nodes and psi plot" loading="lazy">
+  <figcaption>tree with Edge + Distribution, and ψ re-solved on the new mesh.</figcaption>
+</figure>
+
+<p class="todo">TODO: mesh convergence check (halve elements, I-V shouldn't move >1%)</p>
+
+<!-- ============================================================ -->
+<h2 id="study"><span class="n">07</span>study</h2>
+<pre>
+Step 1  Stationary   psi only (c2, c3 off)     → equilibrium
+Step 2  Stationary   all three, init from step 1
+        aux sweep  V0 = range(0,0.01,0.8)     → I-V   (not run yet)
+</pre>
+<p>c2/c3 off in step 1 → φ<sub>n</sub>, φ<sub>p</sub> stay at 0 = equilibrium. Turned off via <i>Modify model configuration for study step</i>.</p>
+
+<!-- ============================================================ -->
+<h2 id="a1"><span class="n">08</span>results, equilibrium (step 1)</h2>
+
+<figure>
+  <img src="img/psi_ok.jpg" alt="psi(x) from COMSOL at equilibrium" loading="lazy">
+  <figcaption>ψ(x), whole device, exponential mesh. −0.54 → +0.36 V. the transition just right of 2 µm is the depletion region, mostly on the n side.</figcaption>
+</figure>
+
+<table>
+<tr><th>quantity</th><th>by hand</th><th>COMSOL</th></tr>
+<tr><td>ψ p+ side</td><td>−0.537 V</td><td>−0.54 V</td></tr>
+<tr><td>ψ n side</td><td>+0.358 V</td><td>+0.36 V</td></tr>
+<tr><td>Vbi</td><td>0.895 V</td><td>0.89 V</td></tr>
+<tr><td>W @ 0 V</td><td>0.340 µm (0.330 w/ −2V<sub>T</sub>)</td><td class="blank">?</td></tr>
+<tr><td>x<sub>p</sub> @ 0 V</td><td>0.34 nm</td><td class="blank">?</td></tr>
+<tr><td>E<sub>max</sub> @ 0 V</td><td>5.3e4 V/cm</td><td class="blank">?</td></tr>
+</table>
+
+<div class="slot"><div><b>[ empty ]</b><br>ψ(x) zoomed, x = 1.9 - 2.6 µm<br>expect: parabola, almost all on the n side</div></div>
+<div class="slot"><div><b>[ empty ]</b><br>ρ(x) = e_const*(p-n+Ndop), y clipped to ±2000 C/m³<br>expect: rectangle +qND ~0.34 µm wide on n side, −qNA spike &lt;1 nm on p+ side</div></div>
+<div class="slot"><div><b>[ empty ]</b><br>E(x) = -psix<br>expect: triangle, ~5.3e6 V/m peak, negative sign (points n → p).<br>my python Poisson check also gives a narrow spike ~1.7e5 V/cm in the first ~10 nm (hole spillover, abrupt step). see if COMSOL shows it</div></div>
+<div class="slot"><div><b>[ empty ]</b><br>n(x), p(x), log scale<br>expect: p ≈ 1e19 / n ≈ 9 on p+, n ≈ 1e16 / p ≈ 9e3 on n (cm⁻³)</div></div>
+<div class="slot"><div><b>[ empty ]</b><br>bands: -psi±0.56, -psi, E<sub>F</sub> = 0<br>expect: flat E<sub>F</sub>, bending ≈ 0.89 eV</div></div>
+
+<!-- ============================================================ -->
+<h2 id="assume"><span class="n">09</span>what I'm ignoring (for now)</h2>
+<ul>
+<li>abrupt step, uniform doping, no epi/substrate</li>
+<li>1D (no edges)</li>
+<li>Boltzmann (p+ at 1e19 is borderline)</li>
+<li>full ionization, no bandgap narrowing</li>
+<li>constant mobility, constant lifetimes</li>
+<li>SRH only, midgap trap. no Auger</li>
+<li>no impact ionization → no breakdown yet</li>
+<li>T = 300 K uniform, steady state</li>
+<li>ideal ohmic contacts</li>
+</ul>
+<p class="note">Theory used for checking additionally assumes sharp depletion edges, low injection, no recombination in the depletion region (Shockley), no series resistance. Where COMSOL and the formulas disagree, one of these is usually why.</p>
+
+<!-- ============================================================ -->
+<h2 id="next"><span class="n">10</span>next</h2>
+
+<h3>expected for step 2 (I-V)</h3>
+<pre>
+Lp (holes, n side)       ~33 um  > neutral n region (9.7 um) → short diode
+J0                       ~1.8e-11 A/cm^2   → I0 ~1.8e-15 A
+ideality 2 → 1           around 0.35-0.4 V
+reverse @ -10 V          ~9e-8 A/cm^2 (~9 pA), SRH generation dominates
+</pre>
+<p class="note">J0 above uses doping-dependent μ (430 for holes on n side). COMSOL has 470 → expect ~5% higher.</p>
+<div class="slot"><div><b>[ empty ]</b><br>I-V forward, log scale</div></div>
+<div class="slot"><div><b>[ empty ]</b><br>I-V reverse</div></div>
+
+<h3>roadmap</h3>
+<pre>
+A  1D    A0 setup ✓  A1 equilibrium ✓  A2 I-V  A3 ideality/SRH  A4 Auger, BGN, FD
+         A5 breakdown  A6 temperature  A7 C-V
+B  2D    axisymmetric, junction edge, breakdown at the edge, guard ring
+C  3D    quarter model, corner breakdown
+D        gaussian profile, epi + n+ substrate, design for BV = 100 V
+E        compact model → ngspice / simscape
+</pre>
+
+<footer>
+  mistakes so far are on the <a href="errors.html">errors page</a>. numbers by hand come from <code>analytics/pn1d_reference.py</code> → <code>data/reference/expected_values.json</code>.
+  <br>repo: <a href="https://github.com/namsat/pn.junction">namsat/pn.junction</a>
+</footer>
+</main>
+</div>
+
+<script>
+// highlight current section in the side nav
+const links = [...document.querySelectorAll('#toc a[href^="#"]')];
+const secs = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+const obs = new IntersectionObserver(es => {
+  es.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id));
+    }
+  });
+}, { rootMargin: '0px 0px -75% 0px' });
+secs.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
