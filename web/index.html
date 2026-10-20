@@ -36,7 +36,7 @@
 <header id="top">
   <h1>pn.junction</h1>
   <div class="meta">pn diode in COMSOL, no Semiconductor Module. drift-diffusion written by hand as 3 Coefficient Form PDEs.<br>
-  working notes, not a tutorial. last update: 21 oct 2026. status: 1D equilibrium ok, I-V next.</div>
+  working notes, not a tutorial. last update: 21 oct 2026, 00:20. status: 1D equilibrium ok, I-V next.</div>
 </header>
 
 <p>I don't have the Semiconductor Module, so the equations go in by hand. Upside: every assumption is something I typed, so I can also take it out later. Plan is 1D → 2D → 3D for the pn junction, then BJT and MOS. Full roadmap at the <a href="#next">bottom</a>.</p>
@@ -99,8 +99,9 @@ V0       0[V]                     // anode, swept later
 
 <p>Component 1 → Definitions → Variables. The selection decides <em>where the variable exists</em>.</p>
 <pre>
-Variables 1   [domain 1]       Ndop = -NA
-Variables 2   [domain 2]       Ndop =  ND
+Variables 1/2   one per domain
+  [domain 1, p+]   Ndop = -NA
+  [domain 2, n]    Ndop =  ND
 
 Variables 3   [entire model]
   n      ni*exp((psi-phin)/Vt)
@@ -112,6 +113,11 @@ Variables 3   [entire model]
   I_tot  J*A_d
 </pre>
 <p>Doping per domain → the step lands exactly on point 2. No <code>if()</code>.</p>
+
+<figure>
+  <img src="img/sel_variables2.jpg" alt="Variables 2 selection highlights domain 1" loading="lazy">
+  <figcaption>in my file Variables 2 is the one on domain 1 (red = selected). order doesn't matter, the domain does.</figcaption>
+</figure>
 
 <!-- ============================================================ -->
 <h2 id="eqs"><span class="n">04</span>equations</h2>
@@ -192,14 +198,15 @@ phip   0
 
 <p>Debye length ~1.3 nm on p+, ~41 nm on n → sub-nm at the junction. 1D is cheap.</p>
 <pre>
-Edge 1 [domain 1] → Distribution: geometric, 400 el, ratio 200,  reverse ON
-Edge 2 [domain 2] → Distribution: geometric, 600 el, ratio 1000, reverse OFF
+Edge 1 [domain 1] → Distribution: exponential, fine end at x = 2 um (reversed)
+Edge 2 [domain 2] → Distribution: exponential, fine end at x = 2 um
+  elements / element ratio:  ? / ?     &lt;- fill in
 </pre>
-<p>~0.1 nm at the junction, ~25 nm / ~100 nm at the contacts. Reverse on domain 1 because it runs 0 → 2 µm and the fine end has to be at 2 µm.</p>
+<p>Planned a geometric sequence (400 el ratio 200 on p+, 600 el ratio 1000 on n, ~0.1 nm at the junction), but my Distribution node has no "geometric" option, so I went with <b>exponential</b>. Same idea: small elements at the junction, growing towards the contacts. Domain 1 runs 0 → 2 µm, so the fine end has to be flipped.</p>
 
 <figure>
-  <img src="img/model_tree_mesh.jpg" alt="COMSOL model tree with Edge nodes" loading="lazy" style="max-width:420px">
-  <figcaption>model tree at this point. Edge nodes without Distribution yet.</figcaption>
+  <img src="img/tree_mesh_psi.jpg" alt="model tree with Edge + Distribution nodes and psi plot" loading="lazy">
+  <figcaption>tree with Edge + Distribution, and ψ re-solved on the new mesh.</figcaption>
 </figure>
 
 <p class="todo">TODO: mesh convergence check (halve elements, I-V shouldn't move >1%)</p>
@@ -218,7 +225,7 @@ Step 2  Stationary   all three, init from step 1
 
 <figure>
   <img src="img/psi_ok.jpg" alt="psi(x) from COMSOL at equilibrium" loading="lazy">
-  <figcaption>ψ(x), whole device. looks like a step because the depletion region is &lt;3% of 12 µm.</figcaption>
+  <figcaption>ψ(x), whole device, exponential mesh. −0.54 → +0.36 V. the transition just right of 2 µm is the depletion region, mostly on the n side.</figcaption>
 </figure>
 
 <table>

@@ -16,6 +16,7 @@
   <a href="#vars">undefined variables</a>
   <a href="#mesh">mesh</a>
   <a href="#bc">boundary conditions</a>
+  <a href="#c3">c3 selection?</a>
 </nav>
 
 <main>
@@ -63,8 +64,8 @@ Failed to evaluate variable.
 
 <h2 id="mesh"><span class="n">#3</span>mesh</h2>
 <p>Two Edge nodes, no idea how to make them fine at the junction. Edge 2 red because it had no selection.</p>
-<figure><img src="img/model_tree_mesh.jpg" alt="model tree, mesh" loading="lazy" style="max-width:420px"></figure>
-<p><b>fix:</b> Edge only says <i>where</i>. Need a Distribution child under each Edge to say <i>how</i> (geometric sequence, reverse on domain 1).</p>
+<p><b>fix:</b> Edge only says <i>where</i>. Need a Distribution child under each Edge to say <i>how</i> (reverse on domain 1). Then: no "geometric sequence" in my Distribution options → used exponential.</p>
+<figure><img src="img/tree_mesh_psi.jpg" alt="model tree with distribution nodes" loading="lazy"><figcaption>after: Distribution under each Edge</figcaption></figure>
 
 <h2 id="bc"><span class="n">#4</span>potential drops back at the cathode</h2>
 <figure><img src="img/psi_wrong_bc.jpg" alt="wrong psi at cathode" loading="lazy" style="max-width:220px"></figure>
@@ -73,7 +74,12 @@ Failed to evaluate variable.
 <b>fix:</b> point 3 → <code>Vt*asinh(ND/(2*ni))</code>. Checked phin/phip too.</p>
 <figure><img src="img/psi_ok.jpg" alt="psi fixed" loading="lazy" style="max-width:560px"><figcaption>after the fix</figcaption></figure>
 
-<h2><span class="n">#5</span>?</h2>
+<h2 id="c3"><span class="n">#5</span>c3 only on domain 2? (to check)</h2>
+<figure><img src="img/sel_c3.jpg" alt="Coefficient Form PDE 3 selection" loading="lazy"></figure>
+<p>Clicking on Coefficient Form PDE 3 highlights only domain 2 (green). If the hole continuity equation isn't active on domain 1, step 1 doesn't care (only psi is solved), but step 2 would be wrong on the p+ side.</p>
+<p class="todo">TODO: check Domain Selection of c, c2, c3 → should be all domains (1, 2)</p>
+
+<h2><span class="n">#6</span>?</h2>
 <p class="todo">next one goes here</p>
 
 <footer><a href="index.html">← back</a></footer>
